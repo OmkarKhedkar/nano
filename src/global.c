@@ -26,6 +26,10 @@
 #include <ctype.h>
 #include <string.h>
 #include <strings.h>
+#include<termio.h>
+#include<menu.h>
+#include<dirent.h>
+#include<unistd.h>
 #include "assert.h"
 
 /* Global variables. */
@@ -195,6 +199,130 @@ int reverse_attr = A_REVERSE;
 
 char *homedir = NULL;
 	/* The user's home directory, from $HOME or /etc/passwd. */
+/*checks whether name is a file*/
+
+int isfile(char *name)	{
+	DIR* directory = opendir(name);
+	if(directory != NULL)	{
+		closedir(directory);
+		return 0;
+	}
+	return -1;
+}
+/*Function displays navigation through directories*/
+void subdir(char *name)	{
+	int i, j, k, ch, w;
+	char **a, *b = NULL;
+	DIR *dp;
+	struct dirent *ep, *eq;
+	ITEM **item1;
+	MENU *menu1;
+	b = mallocstrcpy(b, name);
+	w = 0;
+	if(chdir(b) == -1)	{
+		return;
+	}
+	dp = opendir("./");
+	if(dp != NULL)	{
+		while ((ep = readdir (dp)))	{
+			w++;
+		}
+		(void)closedir(dp);
+	}
+	a = (char **)malloc(w * 1024);
+	i = 0;
+	dp = opendir("./");
+	if(dp != NULL)	{
+		while ((eq = readdir (dp)))	{
+			a[i] = (char *)malloc(strlen(eq->d_name) + 1);
+			strcpy(a[i], eq->d_name);
+			i++;
+		}
+		(void)closedir(dp);
+	}
+	initscr();
+	cbreak();
+	noecho();
+	keypad(stdscr, TRUE);
+	item1 = (ITEM **)calloc(i, sizeof(ITEM *));
+	for(j = 0;j < i;j++)	{
+		item1[j] = new_item(a[j], "\n");
+	}
+	item1[j] = (ITEM *)NULL;
+	menu1 = new_menu((ITEM **)item1);
+	post_menu(menu1);
+	refresh();
+	while((ch = getch()) != KEY_F(1))	{
+		switch(ch)
+		{
+			case KEY_DOWN:
+				menu_driver(menu1, REQ_DOWN_ITEM);
+				break;
+			case KEY_UP:
+				menu_driver(menu1, REQ_UP_ITEM);
+				break;
+			case KEY_NPAGE:
+   			    menu_driver(menu1, REQ_SCR_DPAGE);
+   			    break;
+			case KEY_PPAGE:
+   			    menu_driver(menu1, REQ_SCR_UPAGE);
+   			    break;
+			case 13:	{
+				ITEM *cur;
+				char *l;
+				cur = current_item(menu1);
+				if(cur == NULL)
+					   return;
+				l = (char *)malloc(strlen(item_name(cur)) + 1);
+				strcpy(l, item_name(cur));
+				if(isfile(l))	{
+					unpost_menu(menu1);
+					refresh();
+					char *n;
+					n = (char *)malloc(sizeof(l) + 10);
+					sprintf(n, "nano %s", l);
+					if(system(n) == -1)	{
+						break;
+					}
+					for(k = 0;k < i;k++)
+						free_item(item1[k]);
+					free_menu(menu1);
+					free(n);
+					for(i = 0;i < k;i++)	{
+						free(a[k]);
+					}
+					free(a);
+					free(l);
+					do_exit();
+					return;
+				}
+				else	{
+					unpost_menu(menu1);
+					refresh();
+					subdir((char *)item_name(cur));
+					for(k = 0;k < i;k++)
+						free_item(item1[k]);
+					free_menu(menu1);
+					refresh();
+					for(i = 0;i < k;i++)	{
+						free(a[k]);
+					}
+					free(a);
+					free(l);
+					return;
+				}
+				break;
+			}
+		}
+
+	}
+}
+/*Function starts directory navigation*/
+void directory()	{
+    subdir(".");
+	do_exit();
+	refresh();
+}
 
 /* Return the number of entries in the shortcut list s for a given menu. */
 size_t length_of_list(int menu)
@@ -477,6 +605,7 @@ const char *goto_dir_msg = N_("Go To Dir");
 void shortcut_init(bool unjustify)
 {
     /* TRANSLATORS: Try to keep the following strings at most 10 characters. */
+    const char *directoryy = N_("directory");
     const char *get_help_msg = N_("Get Help");
     const char *exit_msg = N_("Exit");
     const char *whereis_msg = N_("Where Is");
@@ -708,7 +837,7 @@ void shortcut_init(bool unjustify)
     add_to_funcs(DO_PAGE_DOWN, MMAIN|MHELP|MBROWSER,
 	next_page_msg, IFSCHELP(nano_nextpage_msg), TRUE, VIEW);
 
-
+    add_to_funcs(directory, MMOST, N_("directory"), IFSCHELP(directoryy), TOGETHER, VIEW);
     /* TRANSLATORS: Try to keep this at most 10 characters. */
     add_to_funcs(DO_CUT_TEXT_VOID, MMAIN, N_("Cut Text"), IFSCHELP(nano_cut_msg),
 	FALSE, NOVIEW);
@@ -1035,6 +1164,7 @@ void shortcut_init(bool unjustify)
 	"F1", DO_HELP_VOID, 0, TRUE);
     add_to_sclist(MMAIN|MHELP|MBROWSER, "^X", DO_EXIT, 0, TRUE);
     add_to_sclist(MMAIN|MHELP|MBROWSER, "F2", DO_EXIT, 0, TRUE);
+    add_to_sclist(MMAIN, "^N", 0, directory, 0);	
     add_to_sclist(MMAIN, "^_", DO_GOTOLINECOLUMN_VOID, 0, TRUE);
     add_to_sclist(MMAIN, "F13", DO_GOTOLINECOLUMN_VOID, 0, TRUE);
     add_to_sclist(MMAIN, "M-G", DO_GOTOLINECOLUMN_VOID, 0, TRUE);
@@ -1065,6 +1195,7 @@ void shortcut_init(bool unjustify)
     add_to_sclist(MMAIN, "^T", DO_SPELL, 0, TRUE);
     add_to_sclist(MMAIN, "F12", DO_SPELL, 0, TRUE);
 #endif
+	
     add_to_sclist(MMAIN, "^\\", DO_REPLACE, 0, TRUE);
     add_to_sclist(MMAIN, "F14", DO_REPLACE, 0, TRUE);
     add_to_sclist(MMAIN, "M-R", DO_REPLACE, 0, TRUE);
