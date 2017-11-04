@@ -2031,6 +2031,7 @@ int main(int argc, char **argv)
 #endif
 #ifdef HAVE_GETOPT_LONG
     const struct option long_options[] = {
+	{"directory", 0, NULL, 'N'},    
 	{"help", 0, NULL, 'h'},
 	{"boldtext", 0, NULL, 'D'},
 #ifdef ENABLE_MULTIBUFFER
