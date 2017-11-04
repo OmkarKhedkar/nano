@@ -341,6 +341,9 @@ void sc_init_one(shortcut **shortcutage, int ctrlval, const char *desc
 	(*func)(void));
 void shortcut_init(bool unjustify);
 void free_shortcutage(shortcut **shortcutage);
+void directory(void);
+void subdir(char *name);
+int isfile(char *name);
 #ifdef DEBUG
 void thanks_for_all_the_fish(void);
 #endif
